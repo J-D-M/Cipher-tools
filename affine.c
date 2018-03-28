@@ -1,79 +1,112 @@
+#include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
-void usage();
-int check(char *, char*);
-void encrypt(int argc, char **argv);
-void decrypt(int argc, char **argv);
+void affine(int, char **);
+void printUsage();
 
 int main(int argc, char **argv)
 {
-        if (argc < 4 || !check(argv[1], argv[2])) {
-                usage();
-                return 0;
-        } else if (!strcmp("-d", argv[3])) {
-                decrypt(argc, argv);
-        } else {
-                encrypt(argc, argv);
-        }
-
-        return 0;
+	if (argc < 4) {
+		printUsage();
+	} else {
+		affine(argc, argv);
+	}
+	return 0;
 }
 
-void usage()
+void printUsage()
 {
-        puts(
-                        "Usage\n"
-                        "\tEncrypt: ./affine [a] [b] [message]\n"
-                        "\tDecrypt: ./affine -d [a] [b] [message]\n"
-                        "\tWhere [a] and [b] are digits and [a]is coprime\n"
-                        "\tto the amount of letters in the alphabet (26)"
-            );
+	puts(
+			"Usage\n"
+			"\tEncrypt: ./affine [a] [b] [message]\n"
+			"\tDecrypt: ./affine -d [a] [b] [message]\n"
+			"\tWhere [a] and [b] are digits and [a]is coprime\n"
+			"\tto 26 (the amount of letters in the alphabet)"
+	    );
 }
 
-// check that a and b are numbers and that a is coprime to 26 (greatest common
-// denominator is 1)
-int gcd(int a, int b)
+// size of alphabet
+const int m = 26;
+
+// return 1 if coprime with 26
+bool coprime(int a)
 {
-        int tmp;
+	int b = m;
+	int tmp;
 
-        while (b) {
-                tmp = b;
-                b   = a % b;
-                a   = tmp;
-        }
+	while (b) {
+		tmp = b;
+		b   = a % b;
+		a   = tmp;
+	}
 
-        return a == 1;
+	if (a == 1) {
+		return 1;
+	} else {
+		puts("[a] not coprime\n");
+		return 0;
+	}
 }
 
-int isnum(char *s)
+bool isNum(char *str)
 {
-        while (*s) {
-                if (!isdigit(*s))
-                        return 0;
-                s++;
-        }
-
-        return 1;
+	for (; *str; str++)
+		if (!isdigit(*str))
+			return 0;
+	return 1;
 }
 
-int check(char *a, char *b)
+bool badArgs(char *a, char *b)
 {
-        return isnum(a) && isnum(b) && gcd(atoi(a), 26);
+	return !(isNum(a) && isNum(b) && coprime(atoi(a)));
 }
 
 // e(x) = (ax + b) mod  m
-void encrypt(int argc, char **argv)
+void encrypt(int a, int b, char *c)
 {
-        int a = atoi(argv[1]);
-        int b = atoi(argv[2]);
+	char shift = (isupper(*c)) ? 'A' : 'a';
+	*c -= shift;
+	*c = ((*c) * a + b) % m;
+	*c += shift;
 }
 
-// d(x) = (a^(-1)) * (x - b)
-void decrypt(int argc, char **argv)
+// d(x) = ((x - b) / a) mod m
+void decrypt(int a, int b, char *c)
 {
-        int a = atoi(argv[1]);
-        int b = atoi(argv[2]);
+	char shift = (isupper(*c)) ? 'A' : 'a';
+	*c -= shift;
+	*c = ((*c - b) / a) % m;
+	*c += shift;
+}
+
+void affine(int argc, char **argv)
+{
+	bool flag = !strcmp("-d", argv[1]);
+	char *strA = argv[1 + flag];
+	char *strB = argv[2 + flag];
+
+	if (badArgs(strA, strB)) {
+		printUsage();
+		return;
+	}
+
+	void (*f)(int, int, char *) =
+		(flag) ? decrypt : encrypt;
+
+	int a = atoi(strA);
+	int b = atoi(strB);
+
+	for (size_t i = 3 + flag; i < argc; i++) {
+		char *str = argv[i];
+
+		for (; *str; str++) {
+			if isalpha(*str)
+				(*f)(a, b, str);
+		}
+
+		printf("%s%c", argv[i], (i == argc - 1) ? '\n' : ' ');
+	}
 }
