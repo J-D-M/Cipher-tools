@@ -10,36 +10,34 @@ void printUsage();
 int main(int argc, char **argv)
 {
 	if (argc < 4)
-		printUsage();
+		printUsage(argv[0]);
 	else
 		affine(argc, argv);
 	return 0;
 }
 
-void printUsage()
+void printUsage(char *name)
 {
-	puts(
-			"Usage\n"
-			"\tEncrypt: ./affine [a] [b] [message]\n"
-			"\tDecrypt: ./affine -d [a] [b] [message]\n"
-			"\tWhere [a] and [b] are digits\n"
-			"\tand [a] is coprime with 26"
-	    );
+	printf("Usage:\n"
+	       "%s [-d] [a] [b] [message]\n"
+	       "\t-d: decrypt message\n\n"
+	       "\t[a] and [b] must be digits\n"
+	       "\tand [a] must be coprime with 26\n",
+	       name);
 }
 
-// size of alphabet
-const int m = 26;
+#define ALPH_SIZE 26
 
 // return 1 if coprime with 26
 bool coprime(int a)
 {
-	int b = m;
+	int b = ALPH_SIZE;
 	int tmp;
 
 	while (b) {
 		tmp = b;
-		b = a % b;
-		a = tmp;
+		b   = a % b;
+		a   = tmp;
 	}
 
 	if (a == 1) {
@@ -79,9 +77,9 @@ void decrypt(int a, int b, char *c)
 	*c -= shift;
 
 	// preventing underflow
-	b %= 26;
+	b %= ALPH_SIZE;
 	if (b > *c)
-		*c = 26 - (b - *c % 26);
+		*c = ALPH_SIZE - (b - *c % ALPH_SIZE);
 	else
 		*c -= b;
 
@@ -93,32 +91,32 @@ void decrypt(int a, int b, char *c)
 void inverseA(int *a)
 {
 	int i;
-	for (i = *a + 1; (*a * i) % 26 != 1; i++);
+	for (i = *a + 1; (*a * i) % ALPH_SIZE != 1; i++)
+		;
 	*a = i;
 }
 
 void affine(int argc, char **argv)
 {
-	bool flag = !strcmp("-d", argv[1]);
+	bool flag  = !strcmp("-d", argv[1]);
 	char *strA = argv[1 + flag];
 	char *strB = argv[2 + flag];
 
 	if (badArgs(strA, strB)) {
-		printUsage();
+		printUsage(argv[0]);
 		return;
 	}
 
-	void (*f)(int, int, char *) =
-		(flag) ? decrypt : encrypt;
+	void (*f)(int, int, char *) = (flag) ? decrypt : encrypt;
 
 	int a = atoi(strA);
 	int b = atoi(strB);
 
 	// invert a for decryption
-	if (flag) inverseA(&a);
+	if (flag)
+		inverseA(&a);
 
-	for (size_t i = 3 + flag; i < argc; i++)
-	{
+	for (size_t i = 3 + flag; i < argc; i++) {
 		char *str = argv[i];
 
 		for (; *str; str++) {
@@ -126,6 +124,10 @@ void affine(int argc, char **argv)
 				(*f)(a, b, str);
 		}
 
-		printf("%s%c", argv[i], (i == argc - 1) ? '\n' : ' '); // print a spaces between words and end with \n
+		printf(
+		    "%s%c", argv[i],
+		    (i == argc - 1)
+			? '\n'
+			: ' '); // print a spaces between words and end with \n
 	}
 }
