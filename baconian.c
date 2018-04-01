@@ -17,7 +17,7 @@ void baconian(int argc, char **argv, bool decrypt, bool same);
 
 int main(int argc, char **argv)
 {
-	bool same  = false;
+	bool same    = false;
 	bool decrypt = false;
 
 	for (char flag = getopt(argc, argv, "ds"); flag != -1;
@@ -46,10 +46,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-bool isCoded(char c)
-{
-	return c == 'A' || c == 'a' || c == 'B' || c == 'b';
-}
+bool isCoded(char c) { return c == 'A' || c == 'a' || c == 'B' || c == 'b'; }
 
 char *decryptBac(char *str, bool same)
 {
@@ -71,14 +68,16 @@ char *decryptBac(char *str, bool same)
 
 		if (char_count == 5) {
 			char c = 'a' + char_num;
-			if (same && c >= 'v'- 'a')
+
+			// shift for -s flag
+			if (same && c >= 'v' - 'a')
 				c += 2;
 			else if (same && (c >= 'j' - 'a'))
 				++c;
 
 			ret_str[ret_i] = c;
 			char_count     = 0;
-			char_num = 0;
+			char_num       = 0;
 			++ret_i;
 		} else if (char_count == 0 && str[i] == ' ') {
 			ret_str[ret_i] = ' ';
@@ -105,6 +104,8 @@ char *encryptBac(char *str, bool same)
 		if (isalpha(str[i])) {
 			// convert to lowercase for simplicity
 			char c = tolower(str[i]) - 'a';
+
+			// shift for -s flag
 			if (same && c >= 'v' - 'a')
 				c -= 2;
 			else if (same && (c >= 'j' - 'a'))
@@ -154,16 +155,16 @@ char *flatten(int argc, char **argv)
 
 void baconian(int argc, char **argv, bool same, bool decrypt)
 {
-	// get appropriat transform function
+	// get appropriate transform function
 	char *(*transform)(char *, bool) = (decrypt) ? decryptBac : encryptBac;
 	// make args into a single string
 	char *flatArgs = flatten(argc, argv);
-	char *str = (*transform)(flatArgs, same);
+	char *str      = (*transform)(flatArgs, same);
 
-	if (strcmp(str, "") != 0)
-		printf("%s\n", str);
-	else
+	if (decrypt && !strcmp(str, ""))
 		puts("Error: message does not look encrypted");
+	else
+		printf("%s\n", str);
 
 	free(flatArgs);
 	free(str);
