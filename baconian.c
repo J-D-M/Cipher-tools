@@ -1,5 +1,7 @@
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h> // malloc
 #include <string.h> // strlen
 #include <unistd.h> // getopt; optind
 
@@ -11,25 +13,7 @@ void usage(char *name)
 	       name);
 }
 
-char *decrypt(char *str, bool)
-{
-	if (strlen(str) % 5 != 0) {
-		puts("Error: string does not look encoded");
-		return 0;
-	}
-}
-
-void baconian(int argc, char **argv, bool decrypt, bool unique)
-{
-	// get appropriat transform function
-	char *function(char *, bool) = (decrypt) ? decryptBac : encryptBac;
-
-	for (size_t i = optind; i < argc; i++) {
-		printf("%s%c", (*function)(argv[i], unique),
-		       (i < argc - 1) ? ' '
-				      : '\n'); // put newline after last word
-	}
-}
+void baconian(int argc, char **argv, bool decrypt, bool unique);
 
 int main(int argc, char **argv)
 {
@@ -60,4 +44,123 @@ int main(int argc, char **argv)
 	}
 
 	return 0;
+}
+
+bool isCoded(char c)
+{
+	return c == 'A' || c == 'a' || c == 'B' || c == 'b';
+}
+
+char *decryptBac(char *str, bool unique)
+{
+	// max size should be 1/5th size of input
+	char *ret_str = malloc(sizeof(char) * (strlen(str) / 5));
+
+	size_t i     = 0;
+	size_t ret_i = 0;
+
+	int char_count = 0;
+	int char_num   = 0;
+
+	while (str[i]) {
+		if (isCoded(str[i])) {
+			char_count++;
+			if (tolower(str[i]) == 'b')
+				char_num &= 1 << 5 - char_count;
+		}
+
+		if (char_count == 5) {
+			char c = 'a' + char_num;
+
+			if (!unique && c == 'j' || c == 'v')
+				--c;
+
+			ret_str[ret_i] = c;
+			char_count     = 0;
+			++ret_i;
+		} else if (char_count == 0 && str[i] == ' ') {
+			ret_str[ret_i] = ' ';
+			++ret_i;
+		}
+
+		++i;
+	}
+
+	ret_str[ret_i] = '\0';
+	return ret_str;
+}
+
+char *encryptBac(char *str, bool unique)
+{
+	// max size will be 5 * length of input
+	const size_t length = strlen(str);
+	char *ret_str       = malloc(sizeof(char) * length * 5);
+
+	size_t i     = 0;
+	size_t ret_i = 0;
+
+	for (; i < length; i++) {
+		if (isalpha(str[i])) {
+			// convert to lowercase for simplicity
+			int c = tolower(str[i]) - 'a';
+
+			// encode letters; 0 bits are 'a' and 1 bits are 'b'
+			for (int j = 4; j >= 0; j--) {
+				ret_str[ret_i] = 'a' + (c & 1 << j);
+				++ret_i;
+			}
+		} else if (isspace(str[i])) {
+			ret_str[ret_i] = ' ';
+			++ret_i;
+		}
+	}
+
+	ret_str[ret_i] = '\0';
+	return ret_str;
+}
+
+// flatten args into a single string
+char *flatten(int argc, char **argv)
+{
+	size_t buffer_size = 0;
+
+	for (size_t i = optind; i < argc; i++)
+		buffer_size += strlen(argv[i]);
+
+	// spaces between args +1 for null terminator
+	int spaces = argc - optind;
+	char *str  = malloc(sizeof(char) * buffer_size + spaces);
+
+	size_t str_i = 0;
+
+	for (size_t i = 0; i < argc; i++) {
+		for (size_t j = 0; argv[i][j]; j++)
+			str[str_i++] = argv[i][j];
+
+		if (i < argc - 1)
+			str[str_i++] = ' ';
+	}
+
+	str[str_i] = '\0';
+
+	return str;
+}
+
+void baconian(int argc, char **argv, bool decrypt, bool unique)
+{
+	/*
+	// get appropriat transform function
+	char *transform(char *, bool) = (decrypt) ? decryptBac : encryptBac;
+	*/
+
+	// flatten and encrypt/decrypt message
+	char *str = (decrypt) ? decryptBac(flatten(argc, argv), unique)
+	                      : encryptBac(flatten(argc, argv), unique);
+
+	if (!strcmp(str, ""))
+		printf("%s\n", str);
+	else
+		puts("Error: message does not look encrypted");
+
+	free(str);
 }
