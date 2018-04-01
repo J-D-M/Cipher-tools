@@ -28,7 +28,7 @@ void printUsage(char *name)
 
 #define ALPH_SIZE 26
 
-// return 1 if coprime with 26
+// return true if coprime with 26
 bool coprime(int a)
 {
 	int b = ALPH_SIZE;
