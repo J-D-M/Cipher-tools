@@ -8,16 +8,16 @@
 void usage(char *name)
 {
 	printf("Usage:\t%s [-ds] [message...]\n\n"
-	       "\t-s: I-J and U-V have the same code\n"
-	       "\t-d: decrypt\n",
+	       "\t-d: decrypt\n"
+	       "\t-s: I-J and U-V have the same code\n",
 	       name);
 }
 
-void baconian(int argc, char **argv, bool decrypt, bool unique);
+void baconian(int argc, char **argv, bool decrypt, bool same);
 
 int main(int argc, char **argv)
 {
-	bool unique  = true;
+	bool same  = true;
 	bool decrypt = false;
 
 	for (char flag = getopt(argc, argv, "ds"); flag != -1;
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 			decrypt = true;
 			break;
 		case 's':
-			unique = false;
+			same = false;
 			break;
 		default:
 			usage(argv[0]);
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 		puts("Error: no message\n");
 		usage(argv[0]);
 	} else {
-		baconian(argc, argv, unique, decrypt);
+		baconian(argc, argv, same, decrypt);
 	}
 
 	return 0;
@@ -51,7 +51,7 @@ bool isCoded(char c)
 	return c == 'A' || c == 'a' || c == 'B' || c == 'b';
 }
 
-char *decryptBac(char *str, bool unique)
+char *decryptBac(char *str, bool same)
 {
 	// max size should be 1/5th size of input
 	char *ret_str = malloc(sizeof(char) * (strlen(str) / 5));
@@ -66,17 +66,18 @@ char *decryptBac(char *str, bool unique)
 		if (isCoded(str[i])) {
 			char_count++;
 			if (tolower(str[i]) == 'b')
-				char_num &= 1 << 5 - char_count;
+				char_num |= 1 << (5 - char_count);
 		}
 
 		if (char_count == 5) {
 			char c = 'a' + char_num;
 
-			if (!unique && c == 'j' || c == 'v')
+			if (!same && (c == 'j' || c == 'v'))
 				--c;
 
 			ret_str[ret_i] = c;
 			char_count     = 0;
+			char_num = 0;
 			++ret_i;
 		} else if (char_count == 0 && str[i] == ' ') {
 			ret_str[ret_i] = ' ';
@@ -90,11 +91,12 @@ char *decryptBac(char *str, bool unique)
 	return ret_str;
 }
 
-char *encryptBac(char *str, bool unique)
+char *encryptBac(char *str, bool same)
 {
 	// max size will be 5 * length of input
 	const size_t length = strlen(str);
 	char *ret_str       = malloc(sizeof(char) * length * 5);
+	memset(ret_str, strlen(ret_str), '\0');
 
 	size_t i     = 0;
 	size_t ret_i = 0;
@@ -102,11 +104,11 @@ char *encryptBac(char *str, bool unique)
 	for (; i < length; i++) {
 		if (isalpha(str[i])) {
 			// convert to lowercase for simplicity
-			int c = tolower(str[i]) - 'a';
+			char c = tolower(str[i]) - 'a';
 
 			// encode letters; 0 bits are 'a' and 1 bits are 'b'
 			for (int j = 4; j >= 0; j--) {
-				ret_str[ret_i] = 'a' + (c & 1 << j);
+				ret_str[ret_i] = 'a' + ((c & (1 << j)) > 0);
 				++ret_i;
 			}
 		} else if (isspace(str[i])) {
@@ -115,7 +117,6 @@ char *encryptBac(char *str, bool unique)
 		}
 	}
 
-	ret_str[ret_i] = '\0';
 	return ret_str;
 }
 
@@ -133,7 +134,7 @@ char *flatten(int argc, char **argv)
 
 	size_t str_i = 0;
 
-	for (size_t i = 0; i < argc; i++) {
+	for (size_t i = optind; i < argc; i++) {
 		for (size_t j = 0; argv[i][j]; j++)
 			str[str_i++] = argv[i][j];
 
@@ -146,18 +147,13 @@ char *flatten(int argc, char **argv)
 	return str;
 }
 
-void baconian(int argc, char **argv, bool decrypt, bool unique)
+void baconian(int argc, char **argv, bool same, bool decrypt)
 {
-	/*
 	// get appropriat transform function
-	char *transform(char *, bool) = (decrypt) ? decryptBac : encryptBac;
-	*/
+	char *(*transform)(char *, bool) = (decrypt) ? decryptBac : encryptBac;
+	char *str = (*transform)(flatten(argc, argv), same);
 
-	// flatten and encrypt/decrypt message
-	char *str = (decrypt) ? decryptBac(flatten(argc, argv), unique)
-	                      : encryptBac(flatten(argc, argv), unique);
-
-	if (!strcmp(str, ""))
+	if (strcmp(str, "") != 0)
 		printf("%s\n", str);
 	else
 		puts("Error: message does not look encrypted");
