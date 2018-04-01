@@ -17,7 +17,7 @@ void baconian(int argc, char **argv, bool decrypt, bool same);
 
 int main(int argc, char **argv)
 {
-	bool same  = true;
+	bool same  = false;
 	bool decrypt = false;
 
 	for (char flag = getopt(argc, argv, "ds"); flag != -1;
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 			decrypt = true;
 			break;
 		case 's':
-			same = false;
+			same = true;
 			break;
 		default:
 			usage(argv[0]);
@@ -71,9 +71,10 @@ char *decryptBac(char *str, bool same)
 
 		if (char_count == 5) {
 			char c = 'a' + char_num;
-
-			if (!same && (c == 'j' || c == 'v'))
-				--c;
+			if (same && c >= 'v'- 'a')
+				c += 2;
+			else if (same && (c >= 'j' - 'a'))
+				++c;
 
 			ret_str[ret_i] = c;
 			char_count     = 0;
@@ -96,7 +97,6 @@ char *encryptBac(char *str, bool same)
 	// max size will be 5 * length of input
 	const size_t length = strlen(str);
 	char *ret_str       = malloc(sizeof(char) * length * 5);
-	memset(ret_str, strlen(ret_str), '\0');
 
 	size_t i     = 0;
 	size_t ret_i = 0;
@@ -105,6 +105,10 @@ char *encryptBac(char *str, bool same)
 		if (isalpha(str[i])) {
 			// convert to lowercase for simplicity
 			char c = tolower(str[i]) - 'a';
+			if (same && c >= 'v' - 'a')
+				c -= 2;
+			else if (same && (c >= 'j' - 'a'))
+				--c;
 
 			// encode letters; 0 bits are 'a' and 1 bits are 'b'
 			for (int j = 4; j >= 0; j--) {
@@ -116,6 +120,7 @@ char *encryptBac(char *str, bool same)
 			++ret_i;
 		}
 	}
+	ret_str[ret_i] = '\0';
 
 	return ret_str;
 }
@@ -151,12 +156,15 @@ void baconian(int argc, char **argv, bool same, bool decrypt)
 {
 	// get appropriat transform function
 	char *(*transform)(char *, bool) = (decrypt) ? decryptBac : encryptBac;
-	char *str = (*transform)(flatten(argc, argv), same);
+	// make args into a single string
+	char *flatArgs = flatten(argc, argv);
+	char *str = (*transform)(flatArgs, same);
 
 	if (strcmp(str, "") != 0)
 		printf("%s\n", str);
 	else
 		puts("Error: message does not look encrypted");
 
+	free(flatArgs);
 	free(str);
 }
