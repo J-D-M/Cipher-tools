@@ -9,7 +9,7 @@ void usage(char *name)
 {
 	printf("Usage:\t%s [-ds] [message...]\n\n"
 	       "\t-d: decrypt\n"
-	       "\t-s: I-J and U-V have the same code\n",
+	       "\t-s: I-J and U-V will use the same values respectivly\n",
 	       name);
 }
 
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 			break;
 		default:
 			usage(argv[0]);
-			return (-2);
+			return 0;
 			break;
 		}
 	}
