@@ -9,42 +9,94 @@
 void usage(char *name)
 {
 	printf("Usage:\t%s [-d] [message...]\n\n"
-	       "\t-d: decrypt\n",
-	       name);
+			"\t-d: decode\n",
+			name);
 }
 
-int main(int argc, char **argv) { return 0; }
+char *base64(char *str, bool decode);
+char *flatten(char **argv, size_t start, size_t end);
+
+int main(int argc, char **argv)
+{
+	if (argc < 2) {
+		usage(argv[0]);
+	}
+
+	bool decode_flag = !strcmp(argv[1], "-d");
+
+	if (decode_flag && argc < 3) {
+		usage(argv[0]);
+	} else {
+		char *in  = flatten(argv, 1 + decode_flag, argc);
+		char *out = base64(in, decode_flag);
+		puts(out);
+
+		free(in);
+		free(out);
+	}
+
+	return 0;
+}
+
+// flatten args into single string
+char *flatten(char **argv, size_t start, size_t end)
+{
+	size_t buffer_size = 0;
+
+	for (size_t i = start; i < end; i++)
+		buffer_size += strlen(argv[i]);
+
+	// spaces between strings +1 for null terminator
+	size_t spaces = (end - start) - 1;
+	char *str     = malloc((sizeof(char) * buffer_size) + spaces);
+
+	size_t str_i = 0;
+
+	while (start < end) {
+		for (char *j = argv[start]; *j; j++) {
+			str[str_i] = *j;
+			++str_i;
+		}
+
+		if (start < end - 1) {
+			str[str_i] = ' ';
+			++str_i;
+		}
+		++start;
+	}
+
+	str[str_i] = '\0';
+
+	return str;
+}
+
 
 // b64 char values
 const char b64_char[] = {
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+	'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
 };
 
 // values of 64 encoded characters
-char b64ToVal(char c)
+uint64_t b64ToVal(char c)
 {
-	size_t val = 0;
-
 	if (isupper(c))
-		val = c - 'A';
+		return c - 'A';
 	else if (islower(c))
-		val = c - 'a' + 26;
+		return c - 'a' + 26;
 	else if (isdigit(c))
-		val = c - '0' + 52;
+		return c - '0' + 52;
 	else if (c == '+')
-		val = 62;
+		return 62;
 	else if (c == '/')
-		val = 63;
+		return 63;
 	else if (c == '=')
-		val = 0;
+		return 0;
 	else
-		val = -1; // error
-
-	return val;
+		return -1; // error
 }
 
 size_t getEncryptSize(char *str)
@@ -60,43 +112,71 @@ size_t getEncryptSize(char *str)
 	return ret;
 }
 
+uint64_t encodeBuffer(char c) { return c; }
+uint64_t decodeBuffer(char c) { return b64ToVal(c); }
+
 char *base64(char *str, bool decode)
 {
+	size_t str_size  = strlen(str);
+	size_t ret_itter = 0;
+	char *str_ptr    = str;
+
+	size_t ret_size;
+
+	int take;
+	int step;
+	int shift_size;
+	int bit_size;
+	int bit_mask;
+
 	if (decode) {
-		getBuffer = decodeBuffer;
+		ret_size   = str_size;
+		bit_size   = 6;
+		take       = 4;
+		step       = 3;
 		shift_size = 18;
-		bit_size = 6;
+		bit_size   = 6;
+		bit_mask   = 0x3f;
 	} else {
-		getBuffer = encodeBuffer;
+		ret_size   = getEncryptSize(str);
+		bit_size   = 8;
+		take       = 3;
+		step       = 4;
 		shift_size = 16;
-		bit_size = 8;
+		bit_size   = 8;
+		bit_mask   = 0xff;
 	}
 
-	for (size_t i = 0; i < str_len; i += step) {
+	char *ret = malloc(sizeof(char) * (ret_size + 1));
+
+	for (size_t i = 0; i < str_size; i += step) {
 		uint64_t buffer = 0;
 		int shift       = shift_size;
 
 		while (*str_ptr && shift >= 0) {
-			buffer |= (*getBuffer)(*str_ptr) << shift;
+			buffer |= ((decode) ?
+					b64ToVal(*str_ptr) :
+					*str_ptr
+				  ) << shift;
 
 			++str_ptr;
 			shift -= bit_size;
 		}
 
 		for (int j = 0; j < take && j <= str_size - i; j++) {
-			uint64_t temp = buffer >> bit_size * (take - j);
-			tmp &= bit_mask;
-			ret[ret_itter] = tmp;
+			uint64_t tmp = buffer >> bit_size * (take - j);
+
+			ret[ret_itter] = tmp & bit_mask;
 			++ret_itter;
 		}
 	}
 
-	if (!decrypt) {
+	if (!decode) {
 		for (; ret_itter < ret_size - 1; ret_itter++)
-			ret_str[ret_itter] = '=';
+			ret[ret_itter] = '=';
 	}
 
-	ret_str[ret_itter] = '\0';
+	ret[ret_itter] = '\0';
 
-	return ret_str;
+	return ret;
 }
