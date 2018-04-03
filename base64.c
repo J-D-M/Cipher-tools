@@ -1,14 +1,16 @@
+#include <assert.h>
+#include <ctype.h> // isupper, islower, isdigit
 #include <stdbool.h>
-#include <stdint.h>
+#include <stdint.h> // uint64_t
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <stdlib.h> // malloc, free
+#include <string.h> // strlen
 
 void usage(char *name)
 {
 	printf("Usage:\t%s [-d] [message...]\n\n"
-			"\t-d: decrypt\n",
-			name);
+	       "\t-d: decrypt\n",
+	       name);
 }
 
 char *flatten(char **argv, size_t, size_t);
@@ -30,13 +32,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	char *input =
-		flatten(argv, (1 + decode_flag), argc); // skip first arg if its a flag
-
+	// make args into one long string
+	// skip first arg if its a flag
+	// then decode / encode
+	char *input  = flatten(argv, (1 + decode_flag), argc);
 	char *output = (decode_flag) ? decode(input) : encode(input);
 
 	puts(output);
 
+	// return memory
 	free(input);
 	free(output);
 
@@ -54,7 +58,6 @@ char *flatten(char **argv, size_t start, size_t end)
 	// spaces between strings +1 for null terminator
 	size_t spaces = (end - start) - 1;
 	char *str     = malloc((sizeof(char) * buffer_size) + spaces);
-
 
 	size_t str_i = 0;
 
@@ -76,27 +79,84 @@ char *flatten(char **argv, size_t start, size_t end)
 	return str;
 }
 
-// table for char values
-const char b64_char[] = {
-	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-	'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
-};
+// return value of b64 character
+uint64_t b64ToVal(char c)
+{
+	size_t val = 0;
+
+	if (isupper(c))
+		val = c - 'A';
+	else if (islower(c))
+		val = c - 'a' + 26;
+	else if (isdigit(c))
+		val = c - '0' + 52;
+	else if (c == '+')
+		val = 62;
+	else if (c == '/')
+		val = 63;
+	else if (c == '=')
+		val = 0;
+	else
+		val = -1; // error
+
+	return val;
+}
 
 char *decode(char *input)
 {
-	char *ret_str = malloc(sizeof(char) * (strlen(input) + 1));
+	size_t max       = strlen(input);
+	size_t ret_str_i = 0;
+	size_t padding   = 0;
+
+	char *ret_str = malloc(sizeof(char) * max + 1);
+
+	for (size_t i = 0; i < max; i += 4) {
+		uint64_t buffer = 0;
+
+		// put 4 chars into buffer
+		size_t tmp_i = i;
+		int shift    = 18;
+
+		while (tmp_i < max && shift >= 0) {
+			buffer |= b64ToVal(input[tmp_i]) << shift;
+
+			++tmp_i;
+			shift -= 6;
+		}
+
+		// extract unicode characters from buffer
+		for (int j = 0; j < 3 && j + i <= max; j++) {
+			char c = buffer >> 8 * (2 - j);
+		//	char_val >>= 8 * (2 - j);
+		//	c &= 0xff; // 8 rightmost bits
+
+			ret_str[ret_str_i] = c;
+
+			++ret_str_i;
+		}
+	}
+	ret_str[ret_str_i] = '\0';
+
 	return ret_str;
 }
 
-// pad end if necessary
+// table for char values
+const char b64_char[] = {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
+};
+
+// size for new string
 size_t getSize(char *str)
 {
 	size_t size = strlen(str);
-	size_t ret = (size / 3) * 4 ;
+	size_t ret  = (size / 3) * 4;
 	ret += size % 3;
+
+	// pad end if necessary
 	while (ret % 4 != 0)
 		++ret;
 
@@ -108,38 +168,42 @@ char *encode(char *input)
 
 	size_t ret_str_size = getSize(input);
 
+	char *ret_str = malloc(sizeof(char) * ret_str_size);
 
-	char *ret_str    = malloc(sizeof(char) * ret_str_size);
+	size_t ret_str_i = 0;
+	size_t max       = strlen(input);
 
+	for (size_t i = 0; i < max; i += 3) {
+		uint64_t buffer = 0;
 
-	size_t itter     = 0;
-	size_t ret_itter = 0;
-	size_t max = strlen(input);
+		// put 3 chars into buffer
+		size_t tmp_i = i;
+		int shift    = 16;
 
-	while (itter <= max) {
-		uint64_t buffer = (input[itter] << 16);
-		if (itter + 1 < max)
-			buffer |= (input[itter + 1] << 8);
-		if (itter + 2 < max)
-			buffer |= (input[itter + 2]);
+		while (tmp_i < max && shift >= 0) {
+			buffer |= input[tmp_i] << shift;
 
-		// get appropriate bits for b64 char
-		for (int i = 0; i < 4 && i + itter <= max; i++) {
-
-			uint64_t tmp = buffer;
-			tmp >>= 6 * (3 - i);
-			tmp &= 0x3f; // six right most bits
-
-			ret_str[ret_itter] = b64_char[tmp];
-			++ret_itter;
+			++tmp_i;
+			shift -= 8;
 		}
 
-		itter += 3;
+		// extract base 64 characters from buffer
+		for (int j = 0; j < 4 && j + i <= max; j++) {
+			char char_val = buffer >> 6 * (3 - j);
+
+			char_val &= 0x3f; // 6 rightmost bits
+
+			ret_str[ret_str_i] = b64_char[char_val];
+
+			++ret_str_i;
+		}
 	}
 
-	while (ret_itter < ret_str_size - 1)
-		ret_str[ret_itter++] = '=';
-	ret_str[ret_itter++] = '\0';
+	// add '=' padding if necessary
+	for (; ret_str_i < ret_str_size - 1; ret_str_i++)
+		ret_str[ret_str_i] = '=';
+
+	ret_str[ret_str_i] = '\0';
 
 	return ret_str;
 }

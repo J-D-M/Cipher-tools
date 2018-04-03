@@ -164,7 +164,7 @@ void baconian(int argc, char **argv, bool same, bool decrypt)
 	if (decrypt && !strcmp(str, ""))
 		puts("Error: message does not look encrypted");
 	else
-		printf("%s\n", str);
+		puts(str);
 
 	free(flatArgs);
 	free(str);
