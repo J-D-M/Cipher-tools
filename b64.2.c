@@ -18,21 +18,18 @@ char *flatten(char **argv, size_t start, size_t end);
 
 int main(int argc, char **argv)
 {
-	if (argc < 2) {
-		usage(argv[0]);
-	}
+	bool decode_flag = (argc > 2 && !strcmp(argv[1], "-d"));
 
-	bool decode_flag = !strcmp(argv[1], "-d");
-
-	if (decode_flag && argc < 3) {
-		usage(argv[0]);
-	} else {
+	if ((decode_flag && argc > 2) || argc > 1) {
 		char *in  = flatten(argv, 1 + decode_flag, argc);
 		char *out = base64(in, decode_flag);
+
 		puts(out);
 
 		free(in);
 		free(out);
+	} else {
+		usage(argv[0]);
 	}
 
 	return 0;
@@ -48,7 +45,7 @@ char *flatten(char **argv, size_t start, size_t end)
 
 	// spaces between strings +1 for null terminator
 	size_t spaces = (end - start) - 1;
-	char * str    = malloc((sizeof(char) * buffer_size) + spaces);
+	char *str     = malloc((sizeof(char) * buffer_size) + spaces);
 
 	size_t str_i = 0;
 
@@ -121,38 +118,35 @@ char *base64(char *str, bool decode)
 	char *str_ptr    = str;
 
 	size_t ret_size;
-
 	int take;
 	int step;
-	int shift_size;
+	int char_size;
 	int bit_size;
 	int bit_mask;
 
 	if (decode) {
-		ret_size   = str_size;
-		bit_size   = 6;
-		take       = 4;
-		step       = 3;
-		shift_size = 18;
-		bit_size   = 6;
-		bit_mask   = 0x3f;
+		ret_size  = str_size;
+		take      = 3;
+		step      = 4;
+		bit_size  = 6;
+		char_size = 8;
+		bit_mask  = 0xff; // 8 bits
 	} else {
-		ret_size   = getEncryptSize(str);
-		bit_size   = 8;
-		take       = 3;
-		step       = 4;
-		shift_size = 16;
-		bit_size   = 8;
-		bit_mask   = 0xff;
+		ret_size  = getEncryptSize(str);
+		take      = 4;
+		step      = 3;
+		bit_size  = 8;
+		char_size = 6;
+		bit_mask  = 0x3f; // 6 bits
 	}
 
 	char *ret = malloc(sizeof(char) * (ret_size + 1));
 
 	for (size_t i = 0; i < str_size; i += step) {
 		uint64_t buffer = 0;
-		int shift       = shift_size;
 
-		while (*str_ptr && shift >= 0) {
+		for (int shift = step * bit_size; *str_ptr && shift >= 0;
+		     shift -= bit_size) {
 			buffer |= ((decode) ? b64ToVal(*str_ptr) : *str_ptr)
 				  << shift;
 
@@ -160,10 +154,12 @@ char *base64(char *str, bool decode)
 			shift -= bit_size;
 		}
 
-		for (int j = 0; j < take && j <= str_size - i; j++) {
-			uint64_t tmp = buffer >> bit_size * (take - j);
+		for (int shift = take * char_size; shift; shift -= char_size) {
+			// shift bits to extract char
+			uint64_t tmp = buffer >> shift;
 
-			ret[ret_itter] = tmp & bit_mask;
+			ret[ret_itter] =
+			    tmp & bit_mask; // isolate significant bits
 			++ret_itter;
 		}
 	}
