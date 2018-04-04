@@ -19,30 +19,22 @@ char *encode(char *input);
 
 int main(int argc, char **argv)
 {
+	bool decode_flag = argc > 2 && !strcmp("-d", argv[1]);
 
-	if (argc < 2) {
+	if (argc < 2 + decode_flag) {
 		usage(argv[0]);
-		return 0;
+	} else {
+		// make args into one long string
+		// skip first arg if its a flag
+		// then decode / encode
+		char *input  = flatten(argv, (1 + decode_flag), argc);
+		char *output = (decode_flag) ? decode(input) : encode(input);
+
+		puts(output);
+		// return memory
+		free(input);
+		free(output);
 	}
-
-	bool decode_flag = !strcmp("-d", argv[1]);
-
-	if (decode_flag && argc < 3) {
-		usage(argv[0]);
-		return 0;
-	}
-
-	// make args into one long string
-	// skip first arg if its a flag
-	// then decode / encode
-	char *input  = flatten(argv, (1 + decode_flag), argc);
-	char *output = (decode_flag) ? decode(input) : encode(input);
-
-	puts(output);
-
-	// return memory
-	free(input);
-	free(output);
 
 	return 0;
 }
@@ -79,6 +71,14 @@ char *flatten(char **argv, size_t start, size_t end)
 	return str;
 }
 
+// encode value to b64
+const char b64_char[] = {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
+};
 // return value of b64 character
 uint64_t b64ToVal(char c)
 {
@@ -102,54 +102,7 @@ uint64_t b64ToVal(char c)
 	return val;
 }
 
-char *decode(char *input)
-{
-	size_t max       = strlen(input);
-	size_t ret_str_i = 0;
-	size_t padding   = 0;
-
-	char *ret_str = malloc(sizeof(char) * max + 1);
-
-	for (size_t i = 0; i < max; i += 4) {
-		uint64_t buffer = 0;
-
-		// put 4 chars into buffer
-		size_t tmp_i = i;
-		int shift    = 18;
-
-		while (tmp_i < max && shift >= 0) {
-			buffer |= b64ToVal(input[tmp_i]) << shift;
-
-			++tmp_i;
-			shift -= 6;
-		}
-
-		// extract unicode characters from buffer
-		for (int j = 0; j < 3 && j + i <= max; j++) {
-			char c = buffer >> 8 * (2 - j);
-		//	char_val >>= 8 * (2 - j);
-		//	c &= 0xff; // 8 rightmost bits
-
-			ret_str[ret_str_i] = c;
-
-			++ret_str_i;
-		}
-	}
-	ret_str[ret_str_i] = '\0';
-
-	return ret_str;
-}
-
-// table for char values
-const char b64_char[] = {
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
-};
-
-// size for new string
+// size for encoding string
 size_t getSize(char *str)
 {
 	size_t size = strlen(str);
@@ -160,50 +113,77 @@ size_t getSize(char *str)
 	while (ret % 4 != 0)
 		++ret;
 
-	return ret + 1;
+	return ret;
 }
 
-char *encode(char *input)
+char *encode(char *str)
 {
+	size_t str_len = strlen(str);
+	size_t ret_len = getSize(str);
+	size_t ret_i   = 0;
+	char *ret      = malloc(sizeof(char) * (ret_len + 1));
 
-	size_t ret_str_size = getSize(input);
-
-	char *ret_str = malloc(sizeof(char) * ret_str_size);
-
-	size_t ret_str_i = 0;
-	size_t max       = strlen(input);
-
-	for (size_t i = 0; i < max; i += 3) {
+	for (size_t i = 0; i < str_len; i += 3) {
 		uint64_t buffer = 0;
 
 		// put 3 chars into buffer
-		size_t tmp_i = i;
-		int shift    = 16;
+		char *tmp_ptr = &str[i];
+		int shift     = 16;
+		while (*tmp_ptr && shift >= 0) {
+			buffer |= *tmp_ptr << shift;
 
-		while (tmp_i < max && shift >= 0) {
-			buffer |= input[tmp_i] << shift;
-
-			++tmp_i;
+			++tmp_ptr;
 			shift -= 8;
 		}
 
+		shift = 18;
 		// extract base 64 characters from buffer
-		for (int j = 0; j < 4 && j + i <= max; j++) {
-			char char_val = buffer >> 6 * (3 - j);
+		for (int j = 0; j < 4 && j + i <= str_len; j++) {
+			char val = buffer >> shift;
+			val &= 0x3f; // 6 rightmost bits
 
-			char_val &= 0x3f; // 6 rightmost bits
-
-			ret_str[ret_str_i] = b64_char[char_val];
-
-			++ret_str_i;
+			shift -= 6;
+			ret[ret_i] = b64_char[val];
+			++ret_i;
 		}
 	}
 
 	// add '=' padding if necessary
-	for (; ret_str_i < ret_str_size - 1; ret_str_i++)
-		ret_str[ret_str_i] = '=';
+	for (; ret_i < ret_len; ret_i++)
+		ret[ret_i] = '=';
 
-	ret_str[ret_str_i] = '\0';
+	ret[ret_i] = '\0';
+	return ret;
+}
 
-	return ret_str;
+char *decode(char *str)
+{
+	size_t str_len = strlen(str);
+	size_t ret_i   = 0;
+	char *ret      = mallco(sizeof(char) * str_len + 1);
+
+	for (size_t i = 0; i < str_len; i += 4) {
+		uint64_t buffer = 0;
+		// put 4 chars into buffer
+		char *tmp_ptr = &str[i];
+		int shift     = 18;
+		while (*tmp_ptr && shift >= 0) {
+			buffer |= b64ToVal(*tmp_ptr) << shift;
+
+			++tmp_ptr;
+			shift -= 6;
+		}
+		// take 3 chars out
+		shift = 16;
+		for (int j = 0; j < 3 && j + i <= str_len; j++) {
+			char c = buffer >> shift;
+
+			shift -= 8;
+			ret[ret_i] = c;
+			++ret_i;
+		}
+	}
+
+	ret[ret_i] = '\0';
+	return ret;
 }
