@@ -66,7 +66,7 @@ void encrypt(int a, int b, char *c)
 {
 	char shift = (isupper(*c)) ? 'A' : 'a';
 	*c -= shift;
-	*c = ((*c) * a + b) % m;
+	*c = ((*c) * a + b) % ALPH_SIZE;
 	*c += shift;
 }
 
@@ -83,10 +83,9 @@ void decrypt(int a, int b, char *c)
 	else
 		*c -= b;
 
-	*c = a * (*c) % m;
+	*c = a * (*c) % ALPH_SIZE;
 	*c += shift;
 }
-
 // find modular multiplicative inverse
 void inverseA(int *a)
 {
@@ -117,9 +116,7 @@ void affine(int argc, char **argv)
 		inverseA(&a);
 
 	for (size_t i = 3 + flag; i < argc; i++) {
-		char *str = argv[i];
-
-		for (; *str; str++) {
+		for (char *str = argv[i]; *str; str++) {
 			if (isalpha(*str))
 				(*f)(a, b, str);
 		}

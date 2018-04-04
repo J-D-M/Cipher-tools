@@ -9,8 +9,8 @@
 void usage(char *name)
 {
 	printf("Usage:\t%s [-d] [message...]\n\n"
-			"\t-d: decode\n",
-			name);
+	       "\t-d: decode base64 message\n",
+	       name);
 }
 
 char *base64(char *str, bool decode);
@@ -48,7 +48,7 @@ char *flatten(char **argv, size_t start, size_t end)
 
 	// spaces between strings +1 for null terminator
 	size_t spaces = (end - start) - 1;
-	char *str     = malloc((sizeof(char) * buffer_size) + spaces);
+	char * str    = malloc((sizeof(char) * buffer_size) + spaces);
 
 	size_t str_i = 0;
 
@@ -70,14 +70,13 @@ char *flatten(char **argv, size_t start, size_t end)
 	return str;
 }
 
-
 // b64 char values
 const char b64_char[] = {
-	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-	'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
 };
 
 // values of 64 encoded characters
@@ -154,10 +153,8 @@ char *base64(char *str, bool decode)
 		int shift       = shift_size;
 
 		while (*str_ptr && shift >= 0) {
-			buffer |= ((decode) ?
-					b64ToVal(*str_ptr) :
-					*str_ptr
-				  ) << shift;
+			buffer |= ((decode) ? b64ToVal(*str_ptr) : *str_ptr)
+				  << shift;
 
 			++str_ptr;
 			shift -= bit_size;
