@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <ctype.h> // isupper, islower, isdigit
 #include <stdbool.h>
 #include <stdint.h> // uint64_t
